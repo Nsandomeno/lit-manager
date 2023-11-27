@@ -1,3 +1,6 @@
+# Security materials
+security/
+googleapis/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
