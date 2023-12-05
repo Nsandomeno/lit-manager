@@ -102,7 +102,7 @@ async def list_assets(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=msg
         )
-    
+  
 @app.post("/mint-asset")
 async def mint_asset(
     payload: MintAssetRequest
@@ -128,7 +128,42 @@ async def mint_asset(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=msg
         )
+
+@app.post("/fast-mint-asset")
+async def mint_asset(
+    payload: MintAssetRequest
+):
+    try:
+        logger.warning(f"Handled request: {payload.asset_version}")
+        # TODO authenticated; mint asset
+        # TODO determine whether or not to handle asset metadata separately
+        mint = Mint()
+        prepared_batch = mint.mint_grouped_asset(payload)
+        if prepared_batch:
+            broadcast = mint.finalize_batch()
+            return {"success": True, "data": broadcast}
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="New asset mint is pending but could not be broadcast."
+        )
     
+    except HTTPException as err:
+        raise err
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        # NOTE unknown, likely connectivity/CORS, issue
+        # logging required
+        msg = f"Failed to handle request with error: {e}."
+        logger.error(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=msg
+        )
 
 @app.post("/mint-new-group")
 async def mint_new_group(
@@ -147,6 +182,47 @@ async def mint_new_group(
         prepared_batch = mint.mint_grouped_asset(asset)
         return {"success": True, "data": MessageToDict(prepared_batch)}
     
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        # NOTE unknown, likely connectivity/CORS, issue
+        # logging required
+        msg = f"Failed to handle request with error: {e}."
+        logger.error(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=msg
+        )   
+
+@app.post("/fast-mint-new-group")
+async def mint_new_group(
+    payload: AddBatchRequest,
+):
+    try:
+        mint = Mint()
+        data = mint.get_tweaked_group_key_by_name(payload.name)
+
+        asset = MintAssetRequest(
+            name=payload.name, 
+            amount=payload.amount, 
+            group_key=data["group_key"]
+        )
+
+        prepared_batch = mint.mint_grouped_asset(asset)
+        if prepared_batch:
+            broadcast = mint.finalize_batch()
+            return {"success": True, "data": broadcast}
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Asset group mint is pending but could not be broadcast."
+        )
+    
+    except HTTPException as err:
+        raise err
     except Error as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

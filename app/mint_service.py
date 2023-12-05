@@ -112,10 +112,10 @@ class Mint(Tapd):
             raise MintError(message=msg, error_id=ErrorIds.UNKNOWN.value)
     
     # NOTE could be static
-    def handle_finalize_batch_response(self, res: mintrpc.FinalizeBatchResponse) -> dict:
+    def handle_finalize_batch_response(self, res: mintrpc.FinalizeBatchResponse) -> list:
         # TODO create schema
-        broadcast_batches = dict()
-
+        #broadcast_batches = dict()
+        broadcast_batches = []
         data = MessageToDict(res)
         state = data.get("batch", {}).get("state", None)
         batch_tx_id = data.get("batch", {}).get("batchTxid", None)
@@ -125,13 +125,21 @@ class Mint(Tapd):
         
         assets = data.get("batch", {}).get("assets", [])
         for asset in assets:
+            batch = dict()
             # NOTE can only broadcast one batch per asset at a time i.e. no need to check for multiple of
             # one asset
             name = asset["name"]
-            broadcast_batches[name] = dict()
-            broadcast_batches[name]["amount"] = asset["amount"]
-            broadcast_batches[name]["txid"] = batch_tx_id
+            #broadcast_batches[name] = dict()
+            #broadcast_batches[name]["amount"] = asset["amount"]
+            #broadcast_batches[name]["txid"] = batch_tx_id
+            batch["name"] = name
+            batch["amount"] = asset["amount"]
+            batch["txid"] = asset = batch_tx_id
 
+            broadcast_batches.append(batch)
+        # TODO fix this response:
+        # ideally broadcast batches is a list of objects, each describing
+        # an asset.
         return broadcast_batches
 
     def list_batches(self, req: schema.ListBatchesRequest = schema.ListBatchesRequest()):
