@@ -15,7 +15,15 @@ class MintError(Error):
     """
     category: str = "mintrpc"
 
+"""
+    NOTE for application efficiency consider a pattern where these parent
+    objects (Tapd) are initialized at startup and passed to children in api path
+    handlers for each request
 
+    NOTE consider passing Tapd to services via endpoint dependency injection (it still must be initialized once)
+    then it will be received as an initialization parameter instead of
+    via inheritance.
+"""
 class Mint(Tapd):
     def __init__(self):
         try:
@@ -25,13 +33,13 @@ class Mint(Tapd):
         except Error as err:
             if err.error_id == ErrorIds.FAILED_TO_CREATE_GRPC_STUB.value:
                 # NOTE if otherwise, detail field is populated by an error initializing Tapd.
-                err.detail = "Failed to init Mint (child) after successful init of Tapd (parent)"
+                err.detail = "Failed to init Mint (child)."
                 logging.critical(f"{err.detail} : {err.message} : {err.error_id}")
 
             raise err
         except Exception as e:
             # NOTE an unknown error occurred
-            msg = f"Failed to init Mint (child) after successful init of Tapd (parent). Error: {e}"
+            msg = f"Failed to init Mint (child). Error: {e}"
             logging.critical(msg)
             raise Error(message=msg, error_id=ErrorIds.UNKNOWN.value)
         

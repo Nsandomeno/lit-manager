@@ -19,8 +19,8 @@ class ErrorIds(Enum):
     FAILED_TO_READ_TLS_CERT = "s2"
     FAILED_TO_FIND_TLS_CERT = "s3"
     # application
-    FAILED_TO_CREATE_GRPC_STUB = "a0"
-    FAILED_TO_MAP_REQUEST_TO_TYPE = "a1"
+    FAILED_TO_CREATE_GRPC_STUB         = "a0"
+    FAILED_TO_MAP_REQUEST_TO_TYPE      = "a1"
     FAILED_TO_BROADCAST_MINTED_BATCHES = "a2"
     # NOTE add additional error IDs for specific handling
     UNKNOWN                 = "u0"
