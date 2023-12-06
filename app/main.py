@@ -1,11 +1,13 @@
 import logging
 from app.mint_service import Mint
 from app.lnd_service import Lnd
+from app.universe_service import Universe
 from app.utils import configure_environment
 from app.schemas.taproot import ListAssetRequest
 from app.schemas.mint import MintAssetRequest, AddBatchRequest
+from app.schemas.universe import AssetLeavesRequest, AssetRootRequest
 from app.schemas.error import Error, ErrorIds
-from fastapi import FastAPI, status, HTTPException
+from fastapi import FastAPI, status, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from google.protobuf.json_format import MessageToDict
 
@@ -262,6 +264,111 @@ async def finalize_batches():
             detail=msg
         )
 
+@app.get("universe-info")
+async def universe_info():
+    try:
+        universe = Universe()
+        # TODO handle response and mapping
+        info = universe.get_info()
+        return {"success": True, "data": MessageToDict(info)}
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        msg = f"Failed to handle request with error: {e}."
+        logging.critical(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=msg
+        )
+
+@app.get("/universe-federation")
+async def universe_federation():
+    try:
+        universe = Universe()
+        # TODO handle response and mapping
+        servers = universe.list_federation_servers()
+        return {"success": True, "data": MessageToDict(servers)}
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        msg = f"Failed to handle request with error: {e}."
+        logging.critical(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=msg
+        )
+
+@app.get("/universe-stats")
+async def universe_stats():
+    try:
+        universe = Universe()
+        # TODO handle response and mapping
+        stats = universe.get_stats()
+        return {"success": True, "data": MessageToDict(stats)}
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        msg = f"Failed to handle request with error: {e}."
+        logging.critical(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=msg
+        )
+
+@app.get("/universe-asset-roots")
+async def universe_roots(params: AssetRootRequest = Depends()):
+    try:
+        universe = Universe()
+        # TODO handle response and mapping
+        servers = universe.get_asset_roots(params)
+        return {"success": True, "data": MessageToDict(servers)}
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        msg = f"Failed to handle request with error: {e}."
+        logging.critical(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=msg
+        )
+
+@app.get("universe/{asset_id_str}/leaves")
+async def universe_asset_leaves(asset_id_str: str):
+    try:
+        if not asset_id_str:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No asset_id_str found as path param.")
+        
+        universe = Universe()
+        # TODO handle response and mapping
+        leaves = universe.get_asset_leaves(asset_id_str)
+        return {"success": True, "data": MessageToDict(leaves)}
+    except HTTPException as err:
+        raise err
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        msg = f"Failed to handle request with error: {e}."
+        logger.critical(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=msg
+        )
+    
 @app.post("/sign-in")
 async def sign_in():
     # TODO authenticate a node

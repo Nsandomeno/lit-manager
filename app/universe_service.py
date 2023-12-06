@@ -121,9 +121,10 @@ class Universe(Tapd):
             logging.critical(msg)
             raise UniverseError(message=msg, error_id=ErrorIds.UNKNOWN.value)
     
-    def get_asset_leaves(self, req: AssetLeavesRequest):
+    #def get_asset_leaves(self, req: AssetLeavesRequest):
+    def get_asset_leaves(self, asset_id_str: str):
         try:
-            request = universerpc.ID(asset_id_str=req.asset_id_str)
+            request = universerpc.ID(asset_id_str=asset_id_str)
             res: universerpc.AssetLeafResponse = self.stub.AssetLeaves(request, metadata=[('macaroon', self._read_macaroon())])
             # TODO work in progress - handle error
             logging.critical("Universe asset leaves received!")
