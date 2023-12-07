@@ -1,8 +1,9 @@
 import logging
 from app.tapd_service import Tapd
+from app.utils import base64_to_bytes
 from app.lit import universe_pb2 as universerpc
 from app.lit import universe_pb2_grpc as  universestub
-from app.schemas.universe import AssetRootRequest, AssetLeavesRequest
+from app.schemas.universe import AssetRootRequest, ProofType, AssetLeavesRequest
 from app.schemas.error import Error, ErrorIds
 from google.protobuf.json_format import MessageToDict
 
@@ -121,13 +122,18 @@ class Universe(Tapd):
             logging.critical(msg)
             raise UniverseError(message=msg, error_id=ErrorIds.UNKNOWN.value)
     
-    #def get_asset_leaves(self, req: AssetLeavesRequest):
-    def get_asset_leaves(self, asset_id_str: str):
+    #def get_asset_leaves_by_proof_type(self, asset_id_str: str):
+    def get_asset_leaves_by_proof_type(self, req: AssetLeavesRequest):
         try:
-            request = universerpc.ID(asset_id_str=asset_id_str)
+            #asset_id_bytes = base64_to_bytes(asset_id_str)
+            asset_id_bytes = base64_to_bytes(req.asset_id)
+            group_key_bytes = base64_to_bytes(req.group_key)
+            #logging.critical(asset_id_bytes)
+            logging.critical(req.group_key)
+            request = universerpc.ID(group_key=group_key_bytes, proof_type=req.proof_type)
             res: universerpc.AssetLeafResponse = self.stub.AssetLeaves(request, metadata=[('macaroon', self._read_macaroon())])
             # TODO work in progress - handle error
-            logging.critical("Universe asset leaves received!")
+            logging.critical(f"Universe asset leaves received! {MessageToDict(res)}")
             return res
         except Error as err:
             # NOTE logging required, api handler is caller
@@ -136,5 +142,26 @@ class Universe(Tapd):
         except Exception as e:
             # NOTE logging required, api handler is caller
             msg = f"Failed to get universe asset leaves with unknown error: {e}"
+            logging.critical(msg)
+            raise UniverseError(message=msg, error_id=ErrorIds.UNKNOWN.value)
+        
+    def asset_stats_query(self, asset_name_filter: str):
+        """
+            NOTE query can be expanded significantly beyond
+            asset_name_filter
+        """
+        try:
+            request = universerpc.AssetStatsQuery(asset_name_filter=asset_name_filter)
+            res: universerpc.UniverseAssetStats = self.stub.QueryAssetStats(request, metadata=[('macaroon', self._read_macaroon())])
+            # TODO work in progress - handle error
+            logging.critical(f"Asset stats received from query for {asset_name_filter}!")
+            return res
+        except Error as err:
+            # NOTE logging required, api handler is caller
+            logging.critical(err.message)
+            raise err
+        except Exception as e:
+            # NOTE logging required, api handler is caller
+            msg = f"Failed to get assets stats with unknown error: {e}."
             logging.critical(msg)
             raise UniverseError(message=msg, error_id=ErrorIds.UNKNOWN.value)

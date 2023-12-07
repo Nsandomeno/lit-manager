@@ -16,15 +16,15 @@ class ProofType(Enum):
 class AssetRootRequest(BaseModel):
     with_amounts_by_id: bool = True
     offset            : int = 0
-    limit             : int = 100
+    limit             : int = 50
     direction         : SortDirection = SortDirection.SORT_DIRECTION_DESC
 
 
 
 class AssetLeavesRequest(BaseModel):
-    asset_id      : Optional[bytes] = None
-    asset_id_str  : Optional[str] = None
-    group_key     : Optional[bytes] = None
-    group_key_str : Optional[str] = None
-    proof_type    : Optional[ProofType] = None
+    asset_id      : Optional[str] = None
+    #asset_id_str  : Optional[str] = None
+    group_key     : Optional[str] = None
+    #group_key_str : Optional[str] = None
+    proof_type    : int = ProofType.PROOF_TYPE_ISSUANCE.value
 
