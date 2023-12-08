@@ -57,9 +57,9 @@ async def wallet_balance():
 async def list_batches():
     try:
         mint = Mint()
-        prepared_batches = mint.list_batches()
+        batches = mint.list_batches()
 
-        return {"success": True, "data": MessageToDict(prepared_batches)}
+        return {"success": True, "data": batches}
     except Error as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -104,7 +104,28 @@ async def list_assets(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=msg
         )
-  
+
+@app.get("/list-groups")
+async def list_groups():
+    try:
+        mint = Mint()
+        groups = mint.list_groups()
+        return {"success": True, "data": groups}
+    except Error as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err.message
+        )
+    except Exception as e:
+        # NOTE unknown, likely connectivity/CORS, issue
+        # logging required
+        msg = f"Failed to handle request with error: {e}."
+        logger.error(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=msg
+        )
+
 @app.post("/mint-asset")
 async def mint_asset(
     payload: MintAssetRequest
@@ -137,6 +158,7 @@ async def mint_asset(
 ):
     try:
         logger.warning(f"Handled request: {payload.asset_version}")
+        logging.critical(f"PAYLOAD AMOUNT: {payload.amount}")
         # TODO authenticated; mint asset
         # TODO determine whether or not to handle asset metadata separately
         mint = Mint()
@@ -374,17 +396,40 @@ async def universe_asset_leaves(req: AssetLeavesRequest):
     
 @app.get("/universe/asset/stats")
 async def asset_stats_query(asset_name: str):
+    """
+        NOTE the asset_name filter and the methods used in this call
+            are intended to return one asset and will error out as things stand
+            if the filter does not specify exactly an asset_name.
+    """
     try:
         universe = Universe()
         # TODO handle response and mapping
         stats = universe.asset_stats_query(asset_name_filter=asset_name)
         # TODO type this and all responses
-        return {"success": True, "data": MessageToDict(stats), "name": asset_name}
+        return {"success": True, "data": stats, "name": asset_name}
     except Error as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=err.message
         )
+    except Exception as e:
+        msg = f"Failed to handle request with error: {e}."
+        logger.critical(msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=msg
+        )
+    
+@app.get("/asset/supply")
+async def asset_supply(asset_name: str):
+    try:
+        mint = Mint()
+        # TODO handle response and mapping
+        supply = mint.calc_minted_supply(name=asset_name)
+        # TODO type this and all response
+        return {"success": True, "data": supply}
+    except Error as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err.message)
     except Exception as e:
         msg = f"Failed to handle request with error: {e}."
         logger.critical(msg)

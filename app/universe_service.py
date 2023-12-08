@@ -148,14 +148,15 @@ class Universe(Tapd):
     def asset_stats_query(self, asset_name_filter: str):
         """
             NOTE query can be expanded significantly beyond
-            asset_name_filter
+            asset_name_filter - but goal for now requires returning one asset
         """
         try:
             request = universerpc.AssetStatsQuery(asset_name_filter=asset_name_filter)
             res: universerpc.UniverseAssetStats = self.stub.QueryAssetStats(request, metadata=[('macaroon', self._read_macaroon())])
             # TODO work in progress - handle error
             logging.critical(f"Asset stats received from query for {asset_name_filter}!")
-            return res
+            logging.critical(f"response from query assets: {res}")
+            return self.fmt_asset_stats_query(res=res)
         except Error as err:
             # NOTE logging required, api handler is caller
             logging.critical(err.message)
@@ -165,3 +166,35 @@ class Universe(Tapd):
             msg = f"Failed to get assets stats with unknown error: {e}."
             logging.critical(msg)
             raise UniverseError(message=msg, error_id=ErrorIds.UNKNOWN.value)
+    
+    def fmt_asset_stats_query(self, res: universerpc.UniverseAssetStats):
+        """
+        # TODO type response
+
+            NOTE per asset_stats_query, using asset_name_filter to return exactly
+                 one match. That is why we are performing len check of 2 (this seems like an odd quirk in how the Response is structured IMHO)
+        """
+        output = dict()
+        data = MessageToDict(res)
+        group_data = data.get("assetStats", [])
+
+        if len(group_data) != 2:
+            raise UniverseError(message="filter on Universe Asset Stats returned more than one asset. Unable to handle.", error_id=ErrorIds.UNKNOWN.value)
+        
+        subsequent_groups = group_data[0]
+        init_mint_group = group_data[1].get("asset", None)
+        # NOTE this should always be 1
+        init_mint_proofs = int(group_data[1].get("totalProofs", "1"))
+
+        if init_mint_group is None:
+            raise UniverseError(message="Initial group not found. This could indicate an asset where enable_emissions is False.", error_id=ErrorIds.UNKNOWN.value)
+
+        output["name"] = init_mint_group["assetName"]
+        output["genesis_point"] = init_mint_group["genesisPoint"]
+        # TODO determine exactly how sensitive this is as an issuer? as an non-issuer owner?
+        output["group_key"] = subsequent_groups["groupKey"]
+        output["total_supply"] = int(subsequent_groups["groupSupply"]) + int(init_mint_group["totalSupply"])
+        output["total_proofs"] = int(subsequent_groups["totalProofs"]) + init_mint_proofs
+        output["group_anchor"] = subsequent_groups["groupAnchor"]
+
+        return output

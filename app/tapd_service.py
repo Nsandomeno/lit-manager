@@ -69,6 +69,24 @@ class Tapd:
             return grpc.ssl_channel_credentials(cert)
         except Exception:
             return None
+
+    def list_groups(self):
+        try:
+            stub = self._create_taproot_stub()
+            request = taprootrpc.ListGroupsRequest()
+            response: taprootrpc.ListGroupsResponse = stub.ListGroups(request, metadata=[('macaroon', self._read_macaroon())])
+            # TODO work in progress - handle error
+            logging.critical("Received asset groups.")
+
+            return self.agg_groups(res=response)
+        except Error as err:
+            # NOTE logging required, this is a macaroon read error
+            logging.critical(err.message)
+            raise err
+        except Exception as e:
+            # NOTE logging of unknown exception required
+            msg = f"Failed to retirve asset groups with error: {e}."
+            raise Error(message=msg, error_id=ErrorIds.UNKNOWN.value) 
         
     def list_assets(self, req: ListAssetRequest):
         try:
@@ -78,7 +96,7 @@ class Tapd:
                 include_spent=req.include_spent, 
                 include_leased=req.include_leased
             )
-            response: taprootrpc.ListAssetResponse = stub.ListAssets(request ,metadata=[('macaroon', self._read_macaroon())])
+            response: taprootrpc.ListAssetResponse = stub.ListAssets(request, metadata=[('macaroon', self._read_macaroon())])
             # TODO work in progress - handle error
             logging.critical("Received asset list.")
             #logging.critical(response)
@@ -94,13 +112,6 @@ class Tapd:
             msg = f"Failed to retrive list of known assets with error: {e}"
             logging.critical(msg)
             raise Error(message=msg, error_id=ErrorIds.UNKNOWN.value)
-        
-
-    def list_groups(self):
-        """
-            TODO unimplemented
-        """
-        pass
     
     # NOTE could be static
     def agg_list_assets_by_name(self, res: taprootrpc.ListAssetResponse) -> list:
@@ -131,5 +142,30 @@ class Tapd:
 
         return [{"name": key, "supply": asset_map[key]["supply"], "groups": asset_map[key]["groups"]} for key in asset_map.keys()]
 
-        
-        
+    def agg_groups(self, res: taprootrpc.ListGroupsResponse):
+        """
+            TODO create a schema for the dictionaries in the list
+        """
+
+        output = []
+        data = MessageToDict(res)
+        groups = data.get("groups", {})
+        logging.critical(f"Found {len(groups.keys())} groups!")
+        for group in groups.items():
+            asset_group = dict()
+            
+            assets = group[1].get("assets", [])
+            if len(assets) == 0:
+                # TODO create an error_id
+                raise Error(message="No assets found in this group (impossible hopefully).", error_id=ErrorIds.UNKNOWN.value)
+            logging.critical(f"Found {len(assets)} assets!")
+            model = assets[0]
+
+            asset_group["hex_group_key"] = group[0]
+            asset_group["tag"] = model["tag"]
+            asset_group["supply"] = sum([int(d["amount"]) for d in assets])
+            asset_group["asset_ids"] = [d["id"] for d in assets]
+            asset_group["version"] = model["version"]
+            # TODO good place to work with metaHash
+            output.append(asset_group)
+        return output

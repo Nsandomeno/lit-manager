@@ -152,13 +152,16 @@ class Mint(Tapd):
 
     def list_batches(self, req: schema.ListBatchesRequest = schema.ListBatchesRequest()):
         try:
+            # if req.batch_key is not None:
+            #     req.batch_key = base64_to_bytes(req.batch_key)
+
             request = mintrpc.ListBatchRequest(batch_key=req.batch_key, batch_key_str=req.batch_key_str)
             res: mintrpc.ListBatchResponse = self.stub.ListBatches(request, metadata=[('macaroon', self._read_macaroon())])
             # TODO work in progress - handle error
             logging.critical("Asset batches retrived.")
             logging.critical(res)
 
-            return res
+            return self.agg_batches(res)
         except Error as err:
             # NOTE logging required, api handler is caller
             logging.critical(err.message)
@@ -171,6 +174,7 @@ class Mint(Tapd):
 
 
     def get_tweaked_group_key_by_name(self, name: str) -> dict:
+        # TODO error handling
         batches = self.list_batches()
         # TODO will break if list batches returns anything other than rpc Response
         data = MessageToDict(batches)
@@ -183,14 +187,61 @@ class Mint(Tapd):
                 if batch["state"] == "BATCH_STATE_FINALIZED":
                     for asset in batch.get("assets", []):
                         if asset.get("name", "") == name:
-                            key_fmt =  base64_to_bytes(asset["groupKey"])
-                            logging.critical(f"KEY DECODED FROM LIST BATCHES: {key_fmt}")
 
                             asset["group_key"] = base64_to_bytes(asset["groupKey"])
                             return asset
         
         # TODO should have an error_id
         raise MintError(message="Tweaked key not found for asset", error_id=ErrorIds.UNKNOWN.value)
+
+    def agg_batches(self, res: mintrpc.ListBatchResponse):
+        output = dict()
+        data = MessageToDict(res)
+        batches = data.get("batches", [])
+
+        if len(batches) > 0:
+            for batch in batches:
+
+                batch_tx = batch.get("batchTxid", None)
+
+                for asset in batch.get("assets", []):
+                    name = asset["name"]
+                    batch_amt = int(asset.get("amount", "0"))
+
+                    if output.get(name, None) is not None:
+                        # encountered
+                        logging.critical(f"output for additional group encounter: {output[name]}")
+                        output[name]["batch_tx_ids"].append(batch_tx)
+                        output[name]["supply"] = output[name]["supply"] + batch_amt
+                        
+                    else:
+                        # first encounter
+                        record = dict()
+                        record["batch_tx_ids"] = [batch_tx]
+                        record["supply"] = batch_amt
+                        # add record in output for asset
+                        output[name] = record
+            return output
+        else:
+            # TODO should have an error ID
+            raise MintError(message="No batches found in response.", error_id=ErrorIds.UNKNOWN.value)
+
+    def calc_minted_supply(self, name: str):
+        # TODO error handling
+        minted_supply = 0
+        asset = self.get_tweaked_group_key_by_name(name=name)
+        # TODO redundant iteration here - needs to be resolved quickly.
+        request = schema.ListBatchesRequest(batch_key_str=asset["group_key"])
+        res = self.list_batches(request)
+        data = MessageToDict(res)
+        batches = data.get("batches", [])
+        if len(batches) > 0:
+            for batch in batches:
+                # TODO straggling constant
+                if batch["state"] == "BATCH_STATE_FINALIZED":
+                    for group in batch.get("assets", []):
+                        minted_supply += int(group["amount"])
+        return minted_supply
 
     def cancel_batch(self):
         """
