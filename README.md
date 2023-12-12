@@ -61,7 +61,7 @@ Bulk
 
 ## Download security materials
 
-# [ TODO ] - this download feels wrong and I'm very interested to find a better way of sharing this material.
+`[ TODO ] - automatic and check security assumptions.`
 
 According to `https://github.com/lightningnetwork/lnd/blob/master/docs/grpc/python.md`, 
 `tlsextraip` or `tlsextradomain` should be set with `lit.conf`. That will create `tls.cert`s
