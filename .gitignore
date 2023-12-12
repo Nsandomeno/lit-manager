@@ -1,6 +1,10 @@
 # Security materials
+*
+!.gitignore
 security/
 googleapis/
+cli/
+TESTNET_WALLET_LEARN.md
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
